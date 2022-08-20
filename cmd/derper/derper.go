@@ -30,6 +30,7 @@ import (
 	"tailscale.com/atomicfile"
 	"tailscale.com/derp"
 	"tailscale.com/derp/derphttp"
+	"tailscale.com/derp/derpwhat"
 	"tailscale.com/metrics"
 	"tailscale.com/net/stun"
 	"tailscale.com/tsweb"
@@ -54,6 +55,9 @@ var (
 
 	acceptConnLimit = flag.Float64("accept-connection-limit", math.Inf(+1), "rate limit for accepting new connection")
 	acceptConnBurst = flag.Int("accept-connection-burst", math.MaxInt, "burst limit for accepting new connection")
+
+	what    = flag.Bool("whatsapp", false, "Start whatsapp interface")
+	whatDir = flag.String("whatdir", "", "Whatsapp database directory")
 )
 
 var (
@@ -206,6 +210,22 @@ func main() {
 
 	if *runSTUN {
 		go serveSTUN(listenHost, *stunPort)
+	}
+
+	if *what {
+		if *whatDir == "" {
+			*whatDir = "." // TODO(raggi): better defaults
+		}
+
+		dw, err := derpwhat.New(s, *whatDir)
+		if err != nil {
+			log.Fatalf("Starting whatsapp server: %s", err)
+		}
+		if err := dw.Start(); err != nil {
+			log.Fatalf("Starting whatsapp: %s", err)
+		}
+
+		// TODO: graceful shutdown hook to notify peers of disconnection
 	}
 
 	httpsrv := &http.Server{
